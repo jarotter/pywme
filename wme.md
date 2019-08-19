@@ -107,13 +107,14 @@ class WordMoversEmbedding:
     def __init__(self, model=None, R=None, freq=None):
         self.model = DocModel() if model is None else model
         self.R = 1024 if R is None else R
-        self.freq = defualt_frec if freq is None else freq
+        self.freq = self.default_freq if freq is None else freq
         
-    def default_freq(x):
+    def default_freq(self, x):
         """
         """
         cv = CountVectorizer()
-        return
+        a = cv.fit_transform(x).toarray()
+        return a/a.sum()
         
          
 
@@ -126,25 +127,27 @@ class WordMoversEmbedding:
         
         fomega = np.ones(D)/D
         
-        def phi_w(x, fx):
+        def phi_w(x, fx, fomega=fomega):
             """
             x = one real doc (list of word vectors)
             fx nBOW representation of x
             """
-            joint_vocabulary = np.concat()
-            dmat = distance_matrix(x, w)
-            return 
-            wmd =  self.model.embedding.model.wmdistance(x, w)
+            joint_vocabulary = np.concatenate((x,w))
+            fomega = np.concatenate((np.zeros(len(x)), fomega))
+            fx = np.concatenate((fx, np.zeros(len(w))))
+            dmat = distance_matrix(joint_vocabulary, joint_vocabulary)
+            wmd = emd(fx, fomega, dmat)
             return np.exp(-gamma*wmd)
         
-        return list(map(phi_w, X))
+        _args = zip(X, Fx)
+        return list(starmap(phi_w, _args))
     
     def regularize(self, sol_list):
         """
         """
         return 1/np.sqrt(self.R)*np.array(sol_list)
 
-    def fit(self, real_docs):
+    def fit_transform(self, real_docs):
         """
         Compute WME.
         """
@@ -152,27 +155,27 @@ class WordMoversEmbedding:
     
         # 1. Generar vectores
         ## 1.1 De los documentos reales
-        temp = list(pool.map(self.model.embedding.embedd, real_docs))
+        
+        temp = list(map(self.model.embedding.embedd, real_docs))
         replacements = [t['replacements'] for t in temp]
         real_vecs = [t['vectors'] for t in temp]
         del temp
-
+        
         ## 1.2 De documentos aleatorios
         random_lengths = self.model.sample_length(self.R)
         vmin = np.nanmin([np.nanmin(t) for t in real_vecs])
         vmax = np.nanmax([np.nanmax(t) for t in real_vecs])
         args = zip(random_lengths, repeat(vmin), repeat(vmax))
-        random_vecs = pool.starmap(self.model.random_docs, args)
+        random_vecs = starmap(self.model.random_docs, args)
         
         # 2. Calcular representaciones
-        Fx = [freq(t) for t in real_docs]
+        Fx = [self.freq([t])[0] for t in real_docs]
         
         # 3. Calcular WMD
-        args = zip(random_vecs, repeat(real_vecs))
-        Z = list(pool.starmap(self.random_features, args))
-        pool.close()
+        args = zip(random_vecs, repeat(real_vecs), repeat(Fx), random_lengths)
+        Z = list(starmap(self.random_features, args))
 
-        return self.regularize(Z)
+        return self.regularize(Z), replacements
 ```
 
 ---
@@ -181,12 +184,20 @@ class WordMoversEmbedding:
 
 ```python
 texts = pd.Series.from_csv('data/nps.csv', header=None)
-texts = [t for t in texts if type(t) is str]
+texts = [t for t in texts if type(t) is str and len(t)>0]
 ```
 
 ```python
 xs_wme = WordMoversEmbedding()
-emb, repl = xs_wme.fit_transform([texts[i] for i in range(5)])
+Z, repls = xs_wme.fit_transform([texts[i] for i in range(5)])
+```
+
+```python
+repls
+```
+
+```python
+Z.shape
 ```
 
 ```python
