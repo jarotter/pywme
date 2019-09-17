@@ -24,6 +24,7 @@ import pandas as pd
 from fuzzywuzzy import process
 from gensim.models import KeyedVectors
 from pyemd import emd
+import json
 ```
 
 ```python
@@ -91,14 +92,6 @@ class DocModel:
 ```
 
 ```python
-cv = CountVectorizer()
-```
-
-```python
-[cv.fit_transform(t).toarray() for t in [['hola ke ase'], ['hola kla']]]
-```
-
-```python
 class WordMoversEmbedding:
     """General class to implement the Word Mover's Embedding
     with a given probabilistic model and embedding.
@@ -158,6 +151,7 @@ class WordMoversEmbedding:
         
         temp = list(map(self.model.embedding.embedd, real_docs))
         replacements = [t['replacements'] for t in temp]
+        return replacements
         real_vecs = [t['vectors'] for t in temp]
         del temp
         
@@ -188,16 +182,21 @@ texts = [t for t in texts if type(t) is str and len(t)>0]
 ```
 
 ```python
+texts
+```
+
+```python
 xs_wme = WordMoversEmbedding()
-Z, repls = xs_wme.fit_transform([texts[i] for i in range(5)])
+Z, repls = xs_wme.fit_transform(texts)
 ```
 
 ```python
-repls
+pd.DataFrame(Z).to_csv('Z.csv')
 ```
 
 ```python
-Z.shape
+with open('replacements.json', 'w') as fout:
+    json.dump(repls, fout)
 ```
 
 ```python
